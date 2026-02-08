@@ -103,3 +103,84 @@ Notifications are kept as-is for cross-platform consistency.
 Android silent delivery in Expo Go is documented and accepted.
 
 For demos and real-world usage, in-app real-time emergency alerts (UI + sound + vibration) are considered the primary alert mechanism.
+
+
+**DAY 5**
+🔧 Features Implemented Today
+***1. Role-Based System (ADMIN / USER)***
+
+Implemented strict role separation during registration and runtime.
+
+USER: Can trigger and resolve emergencies.
+
+ADMIN (Traffic Authority): Can monitor, verify, and reject emergencies.
+
+Admin users are explicitly excluded from receiving emergency push notifications.
+
+***2. Emergency Lifecycle Management***
+
+USER can trigger an emergency which creates a real-time record in Firebase.
+
+Emergency state transitions handled cleanly:
+
+active → verified (by admin)
+
+active → resolved (by admin or user)
+
+When an emergency is resolved/rejected:
+
+User is automatically redirected back to the Map screen.
+
+Alerts and emergency state are cleared consistently.
+
+***3. Admin Dashboard***
+
+Implemented a centered, clean Admin Dashboard UI.
+
+Displays a list of all active emergencies.
+
+Selecting an emergency opens a dedicated Admin Map View (not shown by default).
+
+Admin Map View includes:
+
+Emergency location
+
+Admin live location
+
+50-meter radius visualization
+
+Actions: Verify Emergency / Reject (End) Emergency
+
+***4. Admin Verification Status for Users***
+
+Users can see real-time status of their emergency:
+
+⏳ Pending verification
+
+✅ Verified by admin
+
+❌ Rejected / Ended
+
+Status updates are reflected instantly using Firebase listeners.
+
+***5. User Emergency Control***
+
+Restored “Resolve Emergency” button on the user side.
+
+User can manually end an emergency (e.g., false alarm).
+
+User-side resolution and admin-side rejection follow the same backend flow.
+
+***6. Push Notification System (Stabilized)***
+
+Push notifications are:
+
+Sent only to USER accounts
+
+Explicitly blocked for ADMIN accounts
+
+Implemented proper cleanup:
+
+Push tokens are removed from the database on logout.
+
+Logged-out users/admins no longer receive notifications.

@@ -15,12 +15,14 @@ export async function triggerEmergency() {
 
   const { lat, lng } = locSnap.val();
 
+  // 🚨 CREATE EMERGENCY
   const emergencyRef = push(ref(db, "emergencies"));
   await set(emergencyRef, {
     userId: user.uid,
     lat,
     lng,
     status: "active",
+    verifiedByAdmin: false,
     createdAt: Date.now(),
   });
 
@@ -28,27 +30,42 @@ export async function triggerEmergency() {
     activeEmergencyId: emergencyRef.key,
   });
 
-  // 🔔 SEND PUSH NOTIFICATION TO LISTENERS
+  // 🔔 SEND PUSH ONLY TO USERS (NOT ADMIN)
+  const usersSnap = await get(ref(db, "users"));
   const tokensSnap = await get(ref(db, "pushTokens"));
-  if (tokensSnap.exists()) {
-    const tokens = Object.values(tokensSnap.val());
 
-    await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(
-        tokens.map((token: any) => ({
-          to: token,
-          sound: "default",
-          title: "🚨 Emergency Nearby",
-          body: "An emergency vehicle is approaching. Please give way.",
-        }))
-      ),
+  if (!usersSnap.exists() || !tokensSnap.exists()) return;
+
+  const users = usersSnap.val();
+  const tokens = tokensSnap.val();
+
+  const pushMessages: any[] = [];
+
+  for (const uid of Object.keys(tokens)) {
+    // 🔒 ROLE CHECK
+    if (!users[uid] || users[uid].role !== "USER") continue;
+
+    // 🔒 DO NOT NOTIFY EMERGENCY CREATOR
+    if (uid === user.uid) continue;
+
+    pushMessages.push({
+      to: tokens[uid],
+      sound: "default",
+      title: "🚨 Emergency Nearby",
+      body: "An emergency vehicle is approaching. Please give way.",
     });
   }
+
+  if (pushMessages.length === 0) return;
+
+  await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(pushMessages),
+  });
 }
 
 export async function resolveEmergency() {

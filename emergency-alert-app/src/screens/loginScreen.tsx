@@ -1,15 +1,52 @@
 import { View, Text, TextInput, Button, Alert } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase/firebaseConfig";
+import { ref, get } from "firebase/database";
+import { auth, db } from "../firebase/firebaseConfig";
 import { useState } from "react";
 
-export default function LoginScreen({ onSwitch }: { onSwitch: () => void }) {
+type Role = "ADMIN" | "USER";
+
+export default function LoginScreen({
+  onSwitch,
+  onLoginSuccess,
+}: {
+  onSwitch: () => void;
+  onLoginSuccess: (role: Role) => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const login = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Email and password are required");
+      return;
+    }
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCred = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      // 🔹 Fetch user role from DB
+      const snapshot = await get(ref(db, `users/${userCred.user.uid}`));
+
+      if (!snapshot.exists()) {
+        Alert.alert("Error", "User record not found");
+        return;
+      }
+
+      const userData = snapshot.val();
+      const role: Role = userData.role;
+
+      if (role !== "ADMIN" && role !== "USER") {
+        Alert.alert("Error", "Invalid user role");
+        return;
+      }
+
+      // 🔹 Manual routing handled by parent
+      onLoginSuccess(role);
     } catch (err: any) {
       Alert.alert("Login failed", err.message);
     }
@@ -36,6 +73,7 @@ export default function LoginScreen({ onSwitch }: { onSwitch: () => void }) {
       />
 
       <Button title="Login" onPress={login} />
+
       <View style={{ marginTop: 10 }}>
         <Button title="Go to Register" onPress={onSwitch} />
       </View>
