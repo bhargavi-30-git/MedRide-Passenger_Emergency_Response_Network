@@ -7,76 +7,56 @@ import {
   Alert,
 } from "react-native";
 import { useEffect, useState } from "react";
-import { ref, onValue, update, get } from "firebase/database";
+import { ref, onValue, update, push, set, get } from "firebase/database";
 import MapView, { Marker } from "react-native-maps";
+import { signOut } from "firebase/auth";
 
-import { db } from "../firebase/firebaseConfig";
-import { getDistanceInMeters } from "../services/geoUtils";
+import { auth, db } from "../firebase/firebaseConfig";
+import { unregisterPushNotifications } from "../services/notificationService";
 
-export default function AdminDashboard() {
+export default function HospitalDashboard() {
   const [emergencies, setEmergencies] = useState<any[]>([]);
+  const user = auth.currentUser;
 
   useEffect(() => {
+    if (!user) return;
+
     const emRef = ref(db, "emergencies");
 
     const unsub = onValue(emRef, (snap) => {
-      if (!snap.exists()) {
-        setEmergencies([]);
-        return;
-      }
+      if (!snap.exists()) return;
 
       const data = snap.val();
       const list = Object.keys(data)
         .map((id) => ({ id, ...data[id] }))
-        .filter((e) => e.status === "pending");
+        .filter(
+          (e) =>
+            e.status === "verified" &&
+            e.assignedHospitalId === user.uid
+        );
 
       setEmergencies(list);
     });
 
     return () => unsub();
-  }, []);
+  }, [user]);
 
-  const verifyAndDispatch = async (emergency: any) => {
+  const sendAmbulance = async (emergency: any) => {
     try {
-      const usersSnap = await get(ref(db, "users"));
-      if (!usersSnap.exists()) return;
+      const ambulanceRef = push(ref(db, "ambulances"));
 
-      const users = usersSnap.val();
-
-      const hospitals = Object.keys(users)
-        .filter((uid) => users[uid].role === "HOSPITAL")
-        .map((uid) => ({ uid, ...users[uid] }));
-
-      if (hospitals.length === 0) {
-        Alert.alert("No hospitals available");
-        return;
-      }
-
-      let nearest: any = null;
-      let minDist = Infinity;
-
-      hospitals.forEach((h) => {
-        if (!h.lat || !h.lng) return;
-
-        const dist = getDistanceInMeters(
-          emergency.lat,
-          emergency.lng,
-          h.lat,
-          h.lng
-        );
-
-        if (dist < minDist) {
-          minDist = dist;
-          nearest = h;
-        }
+      await set(ambulanceRef, {
+        emergencyId: emergency.id,
+        hospitalId: user?.uid,
+        lat: emergency.lat,
+        lng: emergency.lng,
+        status: "enroute",
+        createdAt: Date.now(),
       });
 
-      if (!nearest) return;
-
       await update(ref(db, `emergencies/${emergency.id}`), {
-        status: "verified",
-        verified: true,
-        assignedHospitalId: nearest.uid,
+        ambulanceAssigned: true,
+        status: "ambulance_enroute",
       });
 
       // 🔥 Notify User
@@ -94,35 +74,42 @@ export default function AdminDashboard() {
           body: JSON.stringify({
             to: tokenSnap.val(),
             sound: "default",
-            title: "Emergency Verified",
-            body: "Nearest hospital has been notified.",
+            title: "Ambulance Dispatched",
+            body: "Ambulance is on the way.",
           }),
         });
       }
 
-      Alert.alert("Verified & Hospital Notified");
+      Alert.alert("Ambulance Sent");
     } catch (err) {
       console.log(err);
     }
   };
 
+  const logout = async () => {
+    await unregisterPushNotifications();
+    await signOut(auth);
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Admin Control Center</Text>
+      <Text style={styles.title}>Hospital Dashboard</Text>
+
+      <TouchableOpacity onPress={logout}>
+        <Text style={styles.logout}>Logout</Text>
+      </TouchableOpacity>
 
       <FlatList
         data={emergencies}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
           <Text style={{ textAlign: "center", marginTop: 20 }}>
-            No pending emergencies
+            No assigned emergencies
           </Text>
         }
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text style={styles.bold}>Driver: {item.name}</Text>
-            <Text>Vehicle: {item.vehicleNo}</Text>
-            <Text>Phone: {item.phone}</Text>
+            <Text style={styles.bold}>Emergency: {item.name}</Text>
 
             <MapView
               style={{ height: 200, marginTop: 10 }}
@@ -144,10 +131,10 @@ export default function AdminDashboard() {
 
             <TouchableOpacity
               style={styles.button}
-              onPress={() => verifyAndDispatch(item)}
+              onPress={() => sendAmbulance(item)}
             >
               <Text style={styles.buttonText}>
-                VERIFY & DISPATCH
+                SEND AMBULANCE
               </Text>
             </TouchableOpacity>
           </View>
@@ -163,7 +150,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 15,
+    marginBottom: 10,
+  },
+  logout: {
+    textAlign: "right",
+    color: "red",
+    marginBottom: 10,
   },
   card: {
     backgroundColor: "#fff",
@@ -175,7 +167,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "bold", marginBottom: 5 },
   button: {
     marginTop: 10,
-    backgroundColor: "#1976d2",
+    backgroundColor: "#2e7d32",
     padding: 12,
     borderRadius: 6,
     alignItems: "center",

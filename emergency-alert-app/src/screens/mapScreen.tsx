@@ -28,14 +28,18 @@ export default function MapScreen() {
     const locRef = ref(db, `locations/${user.uid}`);
     const emRef = ref(db, "emergencies");
 
-    onValue(locRef, (snap) => {
+    const locUnsub = onValue(locRef, (snap) => {
       if (snap.exists()) {
         setMyLocation(snap.val());
-        setLoading(false);
+      } else {
+        console.log("No location found for user");
       }
+
+      // 🔥 IMPORTANT: Always stop loading
+      setLoading(false);
     });
 
-    onValue(emRef, (snap) => {
+    const emUnsub = onValue(emRef, (snap) => {
       if (!snap.exists()) {
         setEmergency(null);
         return;
@@ -44,11 +48,12 @@ export default function MapScreen() {
       const data = snap.val();
       for (const id of Object.keys(data)) {
         const e = data[id];
-        if (e.status === "active" && e.userId !== user.uid) {
+        if (e.status === "pending" && e.userId !== user.uid) {
           setEmergency({ id, ...e });
           return;
         }
       }
+
       setEmergency(null);
     });
 
@@ -56,10 +61,10 @@ export default function MapScreen() {
       off(locRef);
       off(emRef);
     };
-  }, []);
+  }, [user]);
 
   const logout = async () => {
-    await unregisterPushNotifications(); // 🔴 KEY FIX
+    await unregisterPushNotifications();
     await signOut(auth);
   };
 
@@ -67,6 +72,14 @@ export default function MapScreen() {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (!myLocation) {
+    return (
+      <View style={styles.loader}>
+        <Text>Location not available</Text>
       </View>
     );
   }
@@ -104,7 +117,10 @@ export default function MapScreen() {
         )}
       </MapView>
 
-      <TouchableOpacity style={styles.emergencyButton} onPress={triggerEmergency}>
+      <TouchableOpacity
+        style={styles.emergencyButton}
+        onPress={triggerEmergency}
+      >
         <Text style={styles.emergencyText}>🚨 EMERGENCY</Text>
       </TouchableOpacity>
     </View>
