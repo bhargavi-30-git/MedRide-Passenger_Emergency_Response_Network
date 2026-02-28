@@ -11,7 +11,6 @@ import EmergencyScreen from "./src/screens/emergencyScreen";
 import AdminDashboard from "./src/screens/adminDashboard";
 import HospitalDashboard from "./src/screens/hospitalDashboard";
 import AmbulanceTrackingScreen from "./src/screens/ambulanceTrackingScreen";
-
 import { startLiveLocationUpdates } from "./src/services/locationService";
 
 type Role = "USER" | "ADMIN" | "HOSPITAL";
@@ -44,51 +43,49 @@ export default function App() {
     return unsub;
   }, []);
 
-  /* ================= USER FLOW ================= */
+  /* ================= USER REALTIME FLOW ================= */
   useEffect(() => {
     if (!user || role !== "USER") return;
 
     startLiveLocationUpdates();
 
-    const emergencyRef = ref(db, "emergencies");
+    const userRef = ref(db, `users/${user.uid}/activeEmergencyId`);
 
-    const unsub = onValue(emergencyRef, (snap) => {
-      if (!snap.exists()) {
+    const unsubUser = onValue(userRef, (snap) => {
+      if (!snap.exists() || !snap.val()) {
         setActiveEmergency(null);
         return;
       }
 
-      const data = snap.val();
+      const emergencyId = snap.val();
+      const emergencyRef = ref(db, `emergencies/${emergencyId}`);
 
-      const myEmergency = Object.keys(data)
-        .map((id) => ({ id, ...data[id] }))
-        .find(
-          (e) =>
-            e.userId === user.uid &&
-            e.status !== "resolved"
-        );
+      const unsubEmergency = onValue(emergencyRef, (emSnap) => {
+        if (!emSnap.exists()) {
+          setActiveEmergency(null);
+          return;
+        }
 
-      if (!myEmergency) {
-        setActiveEmergency(null);
-        return;
-      }
+        const data = emSnap.val();
 
-      setActiveEmergency(myEmergency);
+        if (data.status === "resolved") {
+          setActiveEmergency(null);
+          return;
+        }
+
+        setActiveEmergency({ id: emergencyId, ...data });
+      });
+
+      return () => unsubEmergency();
     });
 
-    return () => unsub();
+    return () => unsubUser();
   }, [user, role]);
 
   /* ================= LOADING ================= */
   if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
       </View>
     );
@@ -112,7 +109,7 @@ export default function App() {
 
   /* ================= USER ROUTING ================= */
 
-  if (activeEmergency?.ambulanceAssigned)
+  if (activeEmergency?.status === "ambulance_enroute")
     return <AmbulanceTrackingScreen emergency={activeEmergency} />;
 
   if (activeEmergency)

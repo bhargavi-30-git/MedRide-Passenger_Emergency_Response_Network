@@ -1,12 +1,23 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import MapView, { Marker } from "react-native-maps";
+import { resolveEmergency } from "../services/emergencyService";
 
-export default function AmbulanceTrackingScreen({ emergency }: any) {
+export default function AmbulanceTrackingScreen({
+  emergency,
+}: {
+  emergency: any;
+}) {
+  if (!emergency) return null;
+
+  const handleResolve = async () => {
+    await resolveEmergency();
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <MapView
         style={{ flex: 1 }}
-        initialRegion={{
+        region={{
           latitude: emergency.lat,
           longitude: emergency.lng,
           latitudeDelta: 0.01,
@@ -18,27 +29,45 @@ export default function AmbulanceTrackingScreen({ emergency }: any) {
             latitude: emergency.lat,
             longitude: emergency.lng,
           }}
-          title="Emergency Location"
+          title="Your Location"
         />
       </MapView>
 
-      <View style={styles.bottom}>
-        <Text style={styles.text}>
+      <View style={styles.bottomContainer}>
+        <Text style={styles.message}>
           🚑 Ambulance is on the way
         </Text>
+
+        <TouchableOpacity style={styles.button} onPress={handleResolve}>
+          <Text style={styles.buttonText}>RESOLVE EMERGENCY</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bottom: {
+  bottomContainer: {
     position: "absolute",
-    bottom: 30,
+    bottom: 40,
     alignSelf: "center",
-    backgroundColor: "#2e7d32",
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 15,
+    elevation: 5,
+    alignItems: "center",
   },
-  text: { color: "#fff", fontWeight: "bold" },
+  message: {
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  button: {
+    backgroundColor: "red",
+    padding: 12,
+    borderRadius: 25,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
 });
