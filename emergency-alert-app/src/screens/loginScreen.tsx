@@ -40,7 +40,7 @@ export default function LoginScreen({
       const userData = snapshot.val();
       const role: Role = userData.role;
 
-      if (role !== "ADMIN" && role !== "USER") {
+      if (role !== "ADMIN" && role !== "USER" && role !== "HOSPITAL") {
         Alert.alert("Error", "Invalid user role");
         return;
       }

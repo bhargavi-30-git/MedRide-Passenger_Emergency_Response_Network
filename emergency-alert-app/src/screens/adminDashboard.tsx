@@ -4,14 +4,16 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Alert,
+  SafeAreaView,
 } from "react-native";
 import { useEffect, useState } from "react";
 import { ref, onValue, update, get } from "firebase/database";
 import MapView, { Marker } from "react-native-maps";
+import { signOut } from "firebase/auth";
 
-import { db } from "../firebase/firebaseConfig";
-import { getDistanceInMeters } from "../services/geoUtils";
+import { db, auth } from "../firebase/firebaseConfig";
+import { unregisterPushNotifications } from "../services/notificationService";
+import { verifyEmergency } from "../services/emergencyService";
 
 export default function AdminDashboard() {
   const [emergencies, setEmergencies] = useState<any[]>([]);
@@ -19,16 +21,31 @@ export default function AdminDashboard() {
   useEffect(() => {
     const emRef = ref(db, "emergencies");
 
-    const unsub = onValue(emRef, (snap) => {
+    const unsub = onValue(emRef, async (snap) => {
       if (!snap.exists()) {
         setEmergencies([]);
         return;
       }
 
       const data = snap.val();
-      const list = Object.keys(data)
-        .map((id) => ({ id, ...data[id] }))
-        .filter((e) => e.status === "pending");
+      const list: any[] = [];
+
+      for (const id of Object.keys(data)) {
+        const e = data[id];
+
+        if (e.status === "pending") {
+          const userSnap = await get(ref(db, `users/${e.userId}`));
+          const userData = userSnap.exists() ? userSnap.val() : {};
+
+          list.push({
+            id,
+            ...e,
+            name: userData.name || "Unknown",
+            vehicleNo: userData.vehicleNo || "N/A",
+            phone: userData.phone || "N/A",
+          });
+        }
+      }
 
       setEmergencies(list);
     });
@@ -36,97 +53,28 @@ export default function AdminDashboard() {
     return () => unsub();
   }, []);
 
-  const verifyAndDispatch = async (emergency: any) => {
-    try {
-      const usersSnap = await get(ref(db, "users"));
-      if (!usersSnap.exists()) return;
-
-      const users = usersSnap.val();
-
-      const hospitals = Object.keys(users)
-        .filter((uid) => users[uid].role === "HOSPITAL")
-        .map((uid) => ({ uid, ...users[uid] }));
-
-      if (hospitals.length === 0) {
-        Alert.alert("No hospitals available");
-        return;
-      }
-
-      let nearest: any = null;
-      let minDist = Infinity;
-
-      hospitals.forEach((h) => {
-        if (!h.lat || !h.lng) return;
-
-        const dist = getDistanceInMeters(
-          emergency.lat,
-          emergency.lng,
-          h.lat,
-          h.lng
-        );
-
-        if (dist < minDist) {
-          minDist = dist;
-          nearest = h;
-        }
-      });
-
-      if (!nearest) return;
-
-      await update(ref(db, `emergencies/${emergency.id}`), {
-        status: "verified",
-        verified: true,
-        assignedHospitalId: nearest.uid,
-      });
-
-      // 🔥 Notify User
-      const tokenSnap = await get(
-        ref(db, `pushTokens/${emergency.userId}`)
-      );
-
-      if (tokenSnap.exists()) {
-        await fetch("https://exp.host/--/api/v2/push/send", {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            to: tokenSnap.val(),
-            sound: "default",
-            title: "Emergency Verified",
-            body: "Nearest hospital has been notified.",
-          }),
-        });
-      }
-
-      Alert.alert("Verified & Hospital Notified");
-    } catch (err) {
-      console.log(err);
-    }
+  const logout = async () => {
+    await unregisterPushNotifications();
+    await signOut(auth);
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Admin Control Center</Text>
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>Admin Dashboard</Text>
 
       <FlatList
+        contentContainerStyle={{ paddingBottom: 150 }}
         data={emergencies}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <Text style={{ textAlign: "center", marginTop: 20 }}>
-            No pending emergencies
-          </Text>
-        }
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text style={styles.bold}>Driver: {item.name}</Text>
-            <Text>Vehicle: {item.vehicleNo}</Text>
-            <Text>Phone: {item.phone}</Text>
+            <Text style={styles.name}>🚨 {item.name}</Text>
+            <Text style={styles.detail}>📞 {item.phone}</Text>
+            <Text style={styles.detail}>🚗 {item.vehicleNo}</Text>
 
             <MapView
-              style={{ height: 200, marginTop: 10 }}
-              initialRegion={{
+              style={styles.map}
+              region={{
                 latitude: item.lat,
                 longitude: item.lng,
                 latitudeDelta: 0.01,
@@ -138,47 +86,106 @@ export default function AdminDashboard() {
                   latitude: item.lat,
                   longitude: item.lng,
                 }}
-                title="Emergency Location"
               />
             </MapView>
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => verifyAndDispatch(item)}
-            >
-              <Text style={styles.buttonText}>
-                VERIFY & DISPATCH
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.verifyBtn}
+                onPress={() => verifyEmergency(item.id)}
+              >
+                <Text style={styles.btnText}>VERIFY</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.rejectBtn}
+                onPress={() =>
+                  update(ref(db, `emergencies/${item.id}`), {
+                    status: "rejected",
+                  })
+                }
+              >
+                <Text style={styles.btnText}>REJECT</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       />
-    </View>
+
+      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: "#eef3f9",
+    padding: 20,
+  },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 15,
+    marginBottom: 20,
   },
   card: {
     backgroundColor: "#fff",
+    borderRadius: 15,
     padding: 15,
-    marginBottom: 15,
-    borderRadius: 10,
-    elevation: 3,
+    marginBottom: 20,
+    elevation: 6,
   },
-  bold: { fontWeight: "bold", marginBottom: 5 },
-  button: {
-    marginTop: 10,
-    backgroundColor: "#1976d2",
+  name: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+  detail: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  map: {
+    height: 180,
+    borderRadius: 10,
+    marginVertical: 10,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  verifyBtn: {
+    backgroundColor: "#1e88e5",
     padding: 12,
-    borderRadius: 6,
+    borderRadius: 10,
+    width: "48%",
     alignItems: "center",
   },
-  buttonText: { color: "#fff", fontWeight: "bold" },
+  rejectBtn: {
+    backgroundColor: "#e53935",
+    padding: 12,
+    borderRadius: 10,
+    width: "48%",
+    alignItems: "center",
+  },
+  btnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  logoutBtn: {
+    position: "absolute",
+    bottom: 80,
+    alignSelf: "center",
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    elevation: 8,
+  },
+  logoutText: {
+    color: "red",
+    fontWeight: "bold",
+  },
 });

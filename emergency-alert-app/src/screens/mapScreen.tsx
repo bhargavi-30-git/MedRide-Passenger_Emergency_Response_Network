@@ -28,6 +28,7 @@ export default function MapScreen() {
     const locRef = ref(db, `locations/${user.uid}`);
     const emRef = ref(db, "emergencies");
 
+    /* ================= LISTEN TO MY LOCATION ================= */
     const locUnsub = onValue(locRef, (snap) => {
       if (snap.exists()) {
         setMyLocation(snap.val());
@@ -35,10 +36,10 @@ export default function MapScreen() {
         console.log("No location found for user");
       }
 
-      // 🔥 IMPORTANT: Always stop loading
       setLoading(false);
     });
 
+    /* ================= LISTEN TO EMERGENCIES ================= */
     const emUnsub = onValue(emRef, (snap) => {
       if (!snap.exists()) {
         setEmergency(null);
@@ -46,15 +47,22 @@ export default function MapScreen() {
       }
 
       const data = snap.val();
+      let foundEmergency = null;
+
       for (const id of Object.keys(data)) {
         const e = data[id];
-        if (e.status === "pending" && e.userId !== user.uid) {
-          setEmergency({ id, ...e });
-          return;
+
+        // 🔥 SHOW EMERGENCY UNTIL IT IS RESOLVED
+        if (
+          e.userId !== user.uid &&
+          e.status !== "resolved"
+        ) {
+          foundEmergency = { id, ...e };
+          break;
         }
       }
 
-      setEmergency(null);
+      setEmergency(foundEmergency);
     });
 
     return () => {
@@ -86,12 +94,14 @@ export default function MapScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* ================= LOGOUT BUTTON ================= */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={logout}>
           <Text style={styles.logout}>Logout</Text>
         </TouchableOpacity>
       </View>
 
+      {/* ================= MAP ================= */}
       <MapView
         style={styles.map}
         initialRegion={{
@@ -117,6 +127,7 @@ export default function MapScreen() {
         )}
       </MapView>
 
+      {/* ================= EMERGENCY BUTTON ================= */}
       <TouchableOpacity
         style={styles.emergencyButton}
         onPress={triggerEmergency}
@@ -129,14 +140,25 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   map: { flex: 1 },
-  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+
+  loader: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   topBar: {
     position: "absolute",
     top: 40,
     right: 20,
     zIndex: 10,
   },
-  logout: { color: "red", fontWeight: "bold" },
+
+  logout: {
+    color: "red",
+    fontWeight: "bold",
+  },
+
   emergencyButton: {
     position: "absolute",
     bottom: 30,
@@ -146,6 +168,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     borderRadius: 30,
   },
-  emergencyText: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  sirenIcon: { width: 40, height: 40 },
+
+  emergencyText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
+  sirenIcon: {
+    width: 40,
+    height: 40,
+  },
 });
