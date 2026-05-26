@@ -1,186 +1,281 @@
-The system uses the Haversine formula to calculate the shortest (great-circle) distance between two GPS coordinates using latitude and longitude. This gives an accurate “as-the-crow-flies” distance, commonly used in GPS and navigation systems.
-
-**In Phase 6 (Day 2), the focus is on direction-aware emergency alerting, not just distance-based alerts.**
+# 🚑 MedRide – Passenger Emergency Response Network
 
-**When an emergency user activates an alert:**
-Only users ahead of or beside the emergency vehicle (based on direction and position) receive the alert.
-Users behind the emergency vehicle do not receive alerts.
-The listener app continuously monitors alerts in real time.
+## 📖 Project Overview
 
-**Key parameters used:**
-GPS location (latitude, longitude)
-Heading/bearing (direction of movement)
-Distance
-Emergency active status
+MedRide is a real-time emergency response and intelligent passenger alert system developed to improve road safety and emergency vehicle coordination.
 
-**Alert lifecycle:**
-When emergency is ON, location updates are sent every 2–3 seconds.
-The alert appears once and remains visible as long as the emergency is active.
-There is no timeout.
+The application uses live GPS tracking, Firebase real-time synchronization, push notifications, and Google Maps integration to provide direction-aware and proximity-based emergency alerts.
 
-**The alert is removed only when:**
-Emergency status becomes inactive,
-The user moves out of range, or
-Direction conditions fail.
-This design ensures relevant, non-distracting alerts and improves road safety by notifying only affected users.
+Unlike traditional emergency systems, MedRide alerts only relevant nearby users based on:
+- Distance
+- Vehicle movement direction
+- Real-time emergency activity
 
-Current status: Live location tracking of the emergency trigger is 50% completed.
--------------------------------------------------------------------------------------------------------------------------------------------------------
-**Day 3 – Emergency & Listener UI Flow (Google Maps Integration)**
-🟢 Normal State (All Users)
-App opens on MapScreen
-Displays:
-  User’s own live location
-  Normal Google Maps view
+This reduces unnecessary alerts and creates a smarter and more efficient emergency response ecosystem.
 
-**🚨 Emergency User Flow**
-When the user taps START EMERGENCY:
-  App switches to a dedicated EmergencyScreen
-  Shows:
-      🚨 Emergency ACTIVE status
-        Live GPS location updates
-        RESOLVE EMERGENCY button
-User is locked on this screen until emergency is resolved
+---
 
-**👀 Listener (Other Users) Flow**
-Listener users stay on MapScreen
-The app continuously listens for active emergencies
-Emergency alerts are received only within a 100-meter radius
-If an emergency is detected within 100 m:
-    🧍 Listener’s live location marker
-    🚑 Emergency vehicle marker
-    Real-time movement of the emergency vehicle
-If the emergency moves beyond 100 m, the marker is removed automatically
+# 🚀 Features
 
-**👉 This is live tracking within a defined proximity, not just a notification.**
+## 👤 User Features
 
-**🧠 Core Design Idea
-Role	Screen
-Emergency User	EmergencyScreen (focused UI)
-Listener User	MapScreen + live emergency tracking**
+✅ Real-time emergency triggering  
+✅ Live GPS location tracking  
+✅ Direction-aware emergency alerts  
+✅ Proximity-based alert system  
+✅ Google Maps integration  
+✅ Push notification support  
+✅ Emergency status tracking  
+✅ Live ambulance tracking  
 
-System characteristics:
-📍 GPS-based distance calculation
-📏 100 m listening radius
-🔴 Live updates
-🔁 Real-time tracking
-🔒 One active emergency at a time
+---
 
-🎯 Why This Design Is Strong
-Prevents unnecessary alerts beyond 100 m
-Improves relevance and safety
-Mirrors real-world emergency systems
-Clean UI with no clutter
-Scales well for future integrations
+## 🛡️ Admin Features
 
-**Viva / Exam Line**
-“Emergency alerts are proximity-based and direction-aware. Listener devices continuously monitor emergencies within a 100-meter radius and track the emergency vehicle live on the map until the emergency is resolved or moves out of range.”
+✅ Verify emergencies  
+✅ Reject false emergencies  
+✅ Monitor active emergency requests  
+✅ View emergency map dashboard  
+✅ Real-time emergency monitoring  
 
-**Day -4 Push Notifications (Expo Go Limitations Acknowledged)**
+---
 
-Integrated expo-notifications and expo-device
+## 🏥 Hospital Features
 
-Successfully:
+✅ Receive verified emergency alerts  
+✅ Dispatch ambulances  
+✅ Monitor live emergency status  
+✅ Real-time ambulance tracking  
 
-Requested permissions
+---
 
-Generated Expo Push Tokens
+# 🛠️ Technology Stack
 
-Verified notification delivery on both platforms
+## Frontend
+- React Native
+- Expo
+- TypeScript
 
-Observed platform behavior:
+## Backend & Database
+- Firebase Authentication
+- Firebase Realtime Database
 
-✅ iOS: notifications appear as pop-up banners when app is in background
+## Maps & Location
+- Google Maps API
+- Expo Location
 
-⚠️ Android (Expo Go): notifications are delivered but may appear silently in the notification tray (no heads-up popup)
+## Notifications
+- Expo Notifications
+- Expo Device
 
-This behavior was confirmed to be a known limitation of Expo Go on Android, not a code issue.
+---
 
-**Final Decision on Notifications**
+# 📂 Project Structure
 
-Notifications are kept as-is for cross-platform consistency.
+```bash
+MedRide-Passenger_Emergency_Response_Network/
+│
+├── app/
+│   ├── assets/
+│   ├── src/
+│   ├── app.json
+│   ├── package.json
+│   ├── package-lock.json
+│   └── tsconfig.json
+│
+├── diagrams/
+│   ├── activity-diagram.png
+│   ├── class-diagram.png
+│   ├── dataflow-diagram.png
+│   ├── sequence-diagram-1.png
+│   ├── sequence-diagram-2.png
+│   ├── system-architecture.png
+│   └── use-case-diagram.png
+│
+├── README.md
+└── .gitignore
+```
 
-Android silent delivery in Expo Go is documented and accepted.
+---
 
-For demos and real-world usage, in-app real-time emergency alerts (UI + sound + vibration) are considered the primary alert mechanism.
+# 🔧 Installation & Setup
 
+## 1. Clone the Repository
 
-**DAY 5**
-🔧 Features Implemented Today
-***1. Role-Based System (ADMIN / USER)***
+```bash
+git clone https://github.com/bhargavi-30-git/MedRide-Passenger_Emergency_Response_Network.git
+```
 
-Implemented strict role separation during registration and runtime.
+---
 
-USER: Can trigger and resolve emergencies.
+## 2. Navigate to the Project Directory
 
-ADMIN (Traffic Authority): Can monitor, verify, and reject emergencies.
+```bash
+cd MedRide-Passenger_Emergency_Response_Network/app
+```
 
-Admin users are explicitly excluded from receiving emergency push notifications.
+---
 
-***2. Emergency Lifecycle Management***
+## 3. Install Dependencies
 
-USER can trigger an emergency which creates a real-time record in Firebase.
+```bash
+npm install
+```
 
-Emergency state transitions handled cleanly:
+---
 
-active → verified (by admin)
+## 4. Configure Environment Variables
 
-active → resolved (by admin or user)
+Create a `.env` file and add your Firebase credentials:
 
-When an emergency is resolved/rejected:
+```env
+EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
+EXPO_PUBLIC_FIREBASE_DATABASE_URL=your_database_url
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
+```
 
-User is automatically redirected back to the Map screen.
+---
 
-Alerts and emergency state are cleared consistently.
+## 5. Start the Application
 
-***3. Admin Dashboard***
+```bash
+npx expo start
+```
 
-Implemented a centered, clean Admin Dashboard UI.
+---
 
-Displays a list of all active emergencies.
+# 📱 System Workflow
 
-Selecting an emergency opens a dedicated Admin Map View (not shown by default).
+## 👤 User Workflow
 
-Admin Map View includes:
+1. User logs into the application.
+2. Live GPS tracking continuously updates location.
+3. User triggers emergency using the emergency button.
+4. Emergency data is stored in Firebase Realtime Database.
+5. Nearby users are identified using proximity filtering.
+6. Push notifications are sent to nearby users and traffic authorities.
+7. User receives live emergency tracking updates.
 
-Emergency location
+---
 
-Admin live location
+## 🛡️ Admin Workflow
 
-50-meter radius visualization
+1. Admin monitors active emergencies from dashboard.
+2. Emergency location appears on live map.
+3. Admin verifies or rejects the emergency.
 
-Actions: Verify Emergency / Reject (End) Emergency
+### If Verified:
+- Hospitals receive emergency notifications.
+- Ambulance dispatch process begins.
 
-***4. Admin Verification Status for Users***
+### If Rejected:
+- Emergency status changes to rejected.
+- Emergency tracking is terminated.
 
-Users can see real-time status of their emergency:
+---
 
-⏳ Pending verification
+## 🏥 Hospital Workflow
 
-✅ Verified by admin
+1. Hospital receives verified emergency request.
+2. Ambulance is dispatched.
+3. Ambulance tracking starts in real time.
+4. User receives live ambulance tracking updates.
+5. Emergency status updates until resolution.
 
-❌ Rejected / Ended
+---
 
-Status updates are reflected instantly using Firebase listeners.
+# 📡 Core Functionalities
 
-***5. User Emergency Control***
+## 🚨 Emergency Trigger System
+- Real-time emergency activation
+- Live emergency status management
+- Emergency lifecycle handling:
+  - Pending
+  - Verified
+  - Rejected
+  - Resolved
 
-Restored “Resolve Emergency” button on the user side.
+---
 
-User can manually end an emergency (e.g., false alarm).
+## 📍 Proximity-Based Alerts
+- Nearby users are detected within emergency radius.
+- Users outside the range stop receiving updates.
+- Emergency markers disappear automatically after resolution.
 
-User-side resolution and admin-side rejection follow the same backend flow.
+---
 
-***6. Push Notification System (Stabilized)***
+## 🧭 Direction-Aware Notifications
+The system intelligently identifies:
+- Users ahead of the emergency vehicle
+- Users beside the vehicle
+- Users behind the vehicle
 
-Push notifications are:
+Only relevant nearby users receive alerts.
 
-Sent only to USER accounts
+---
 
-Explicitly blocked for ADMIN accounts
+## 🗺️ Real-Time Map Tracking
+Integrated map features include:
+- Live user location
+- Emergency vehicle markers
+- Real-time ambulance movement
+- Dynamic emergency visualization
 
-Implemented proper cleanup:
+---
 
-Push tokens are removed from the database on logout.
+## 🔔 Push Notification System
 
-Logged-out users/admins no longer receive notifications.
+Implemented using Expo Notifications.
+
+### Features
+- Real-time emergency notifications
+- Push token generation
+- Background notification support
+- Platform-aware notification behavior
+
+---
+
+# 🔥 Firebase Features Used
+
+- Firebase Authentication
+- Firebase Realtime Database
+- Real-time listeners
+- Live synchronization
+- Push notification token management
+
+---
+
+
+# 🚀 Future Enhancements
+
+- AI-based route optimization
+- Ambulance traffic prioritization
+- Voice-based emergency activation
+- Multi-emergency handling
+- Advanced analytics dashboard
+- Offline emergency support
+- Cloud Functions integration
+- Dedicated production notification server
+
+---
+
+# 🎯 Project Highlights
+
+✅ Real-time GPS tracking  
+✅ Firebase real-time synchronization  
+✅ Google Maps integration  
+✅ Direction-aware emergency alerts  
+✅ Push notification integration  
+✅ Role-based access system  
+✅ Admin verification dashboard  
+✅ Live emergency monitoring  
+
+---
+
+# 📄 License
+
+This project is created for educational and research purposes.
